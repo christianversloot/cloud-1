@@ -16,6 +16,7 @@
 
 import copy
 from absl.testing import parameterized
+import kerastuner
 from kerastuner.engine import hyperparameters as hp_module
 from kerastuner.engine import oracle as oracle_module
 from kerastuner.engine import trial as trial_module
@@ -161,13 +162,23 @@ STUDY_CONFIG_FIXED_CATEGORICAL = {
         }
     ],
 }
-STUDY_CONFIG_FIXED_BOOLEAN = {
+STUDY_CONFIG_FIXED_BOOLEAN0 = {
     "metrics": [{"goal": "MAXIMIZE", "metric": "accuracy"}],
     "parameters": [
         {
             "discrete_value_spec": {"values": [1.0]},
             "parameter": "condition",
             "type": "DISCRETE",
+        }
+    ],
+}
+STUDY_CONFIG_FIXED_BOOLEAN1 = {
+    "metrics": [{"goal": "MAXIMIZE", "metric": "accuracy"}],
+    "parameters": [
+        {
+            "categorical_value_spec": {"values": ["True"]},
+            "parameter": "condition",
+            "type": "CATEGORICAL",
         }
     ],
 }
@@ -284,7 +295,9 @@ class CloudTunerUtilsTest(tf.test.TestCase, parameterized.TestCase):
     @parameterized.parameters(
         ("beta", 0.1, STUDY_CONFIG_FIXED_FLOAT),
         ("type", "WIDE_AND_DEEP", STUDY_CONFIG_FIXED_CATEGORICAL),
-        ("condition", True, STUDY_CONFIG_FIXED_BOOLEAN))
+        ("condition", True, (STUDY_CONFIG_FIXED_BOOLEAN0
+                             if kerastuner.__version__ < "1.0.3" else
+                             STUDY_CONFIG_FIXED_BOOLEAN1)))
     def test_convert_study_config_fixed(self, name, value, expected_config):
         hps = hp_module.HyperParameters()
         hps.Fixed(name, value)
@@ -405,8 +418,10 @@ class CloudTunerUtilsTest(tf.test.TestCase, parameterized.TestCase):
         hps = hp_module.HyperParameters()
         hps.Fixed("condition", True)
         hparams = utils.convert_hyperparams_to_hparams(hps)
+        expected_condition = 1 if kerastuner.__version__ < "1.0.3" else True
         expected_hparams = {
-            hparams_api.HParam("condition", hparams_api.Discrete([1])): 1,
+            hparams_api.HParam("condition", hparams_api.Discrete(
+                [expected_condition])): expected_condition,
         }
         self.assertEqual(repr(hparams), repr(expected_hparams))
 
